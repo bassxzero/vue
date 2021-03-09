@@ -1,0 +1,81 @@
+version: "3.7"
+services:
+  app:
+    build:
+      args:
+        user: sammy
+        uid: 1000
+      context: ./
+      dockerfile: Dockerfile
+    image: metube
+    container_name: metube-app
+    restart: unless-stopped
+    working_dir: /var/www/
+    volumes:
+      - ./:/var/www
+    networks:
+      - metube
+
+  db:
+    image: mysql:5.7
+    container_name: metube-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_USER: ${DB_USERNAME}
+      SERVICE_TAGS: dev
+      SERVICE_NAME: mysql
+    volumes:
+      - ./docker-compose/mysql:/docker-entrypoint-initdb.d
+    networks:
+      - metube
+
+  nginx:
+    image: nginx:alpine
+    container_name: metube-nginx
+    restart: unless-stopped
+    ports:
+      - 8000:80
+    volumes:
+      - ./:/var/www
+      - ./docker-compose/nginx:/etc/nginx/conf.d/
+    networks:
+      - metube
+
+  myadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: metube-phpmyadmin
+    ports:
+      - 5000:80
+    depends_on:
+      - db
+    environment:
+      PMA_HOST: db
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      PMA_USER: root
+      PMA_PASSWORD: root
+    networks:
+      - metube
+
+  node:
+    image: node:latest
+    container_name: metube-nodejs
+    user: "node"
+    working_dir: /home/node/app
+    command: "/bin/bash"
+    stdin_open: true
+    tty: true
+    ports:
+      - 3000:3000
+    environment:
+      HOST: 0.0.0.0
+    volumes:
+      - ./:/home/node/app
+
+networks:
+  metube:
+    driver: bridge
